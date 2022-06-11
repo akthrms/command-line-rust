@@ -6,20 +6,19 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
 fn dies_no_args() -> TestResult {
-    let mut cmd = Command::cargo_bin("echor")?;
-    cmd.assert()
+    Command::cargo_bin("echor")?
+        .assert()
         .failure()
         .stderr(predicate::str::contains("USAGE"));
     Ok(())
 }
 
 fn run(args: &[&str], expected_file: &str) -> TestResult {
-    let expected = fs::read_to_string(expected_file)?;
     Command::cargo_bin("echor")?
         .args(args)
         .assert()
         .success()
-        .stdout(expected);
+        .stdout(fs::read_to_string(expected_file)?);
     Ok(())
 }
 
