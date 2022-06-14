@@ -1,5 +1,7 @@
 use clap::Parser;
 use std::error::Error;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, Read};
 
 type AppResult<T> = Result<T, Box<dyn Error>>;
 
@@ -38,8 +40,45 @@ pub struct App {
 
 impl App {
     pub fn run(self) -> AppResult<()> {
-        println!("{:#?}", self);
+        for (file_num, filename) in self.files.iter().enumerate() {
+            match open(&filename) {
+                Err(e) => eprintln!("{}: {}", filename, e),
+                Ok(mut file) => {
+                    if self.files.len() > 1 {
+                        println!(
+                            "{}==> {} <==",
+                            if file_num > 0 { "\n" } else { "" },
+                            filename
+                        );
+                    }
+
+                    if let Some(bytes) = self.bytes {
+                        let mut handle = file.take(bytes as u64);
+                        let mut buffer = vec![0; bytes];
+                        let bytes = handle.read(&mut buffer)?;
+                        print!("{}", String::from_utf8_lossy(&buffer[..bytes]));
+                    } else {
+                        let mut line = String::new();
+                        for _ in 0..self.lines {
+                            let bytes = file.read_line(&mut line)?;
+                            if bytes == 0 {
+                                break;
+                            }
+                            print!("{}", line);
+                            line.clear();
+                        }
+                    }
+                }
+            }
+        }
         Ok(())
+    }
+}
+
+fn open(filename: &str) -> AppResult<Box<dyn BufRead>> {
+    match filename {
+        "-" => Ok(Box::new(BufReader::new(io::stdin()))),
+        _ => Ok(Box::new(BufReader::new(File::open(filename)?))),
     }
 }
 
@@ -70,5 +109,5 @@ fn test_parse_positive_int() {
 
     let res = parse_positive_int("0");
     assert!(res.is_err());
-    assert_eq!(res.unwrap_err(), "0");
+    assert_eq!(res.unwrap_err().to_string(), "0");
 }
