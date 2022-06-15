@@ -49,15 +49,55 @@ impl App {
             self.bytes = true;
         }
 
+        let mut total_lines = 0;
+        let mut total_words = 0;
+        let mut total_bytes = 0;
+        let mut total_chars = 0;
+
         for filename in &self.files {
             match open(filename) {
-                Err(e) => eprintln!("{}: {}", filename, e),
+                Err(e) => {
+                    eprintln!("{}: {}", filename, e)
+                }
+
                 Ok(file) => {
-                    if let Ok(info) = count(file) {
-                        println!("{:?}", info);
+                    if let Ok(FileInfo {
+                        lines,
+                        words,
+                        bytes,
+                        chars,
+                    }) = count(file)
+                    {
+                        println!(
+                            "{}{}{}{}{}",
+                            format_field(lines, self.lines),
+                            format_field(words, self.words),
+                            format_field(bytes, self.bytes),
+                            format_field(chars, self.chars),
+                            if filename == "-" {
+                                "".to_string()
+                            } else {
+                                format!(" {}", filename)
+                            }
+                        );
+
+                        total_lines += lines;
+                        total_words += words;
+                        total_bytes += bytes;
+                        total_chars += chars;
                     }
                 }
             }
+        }
+
+        if self.files.len() > 1 {
+            println!(
+                "{}{}{}{} total",
+                format_field(total_lines, self.lines),
+                format_field(total_words, self.words),
+                format_field(total_bytes, self.bytes),
+                format_field(total_chars, self.chars)
+            );
         }
 
         Ok(())
@@ -68,6 +108,14 @@ fn open(filename: &str) -> AppResult<Box<dyn BufRead>> {
     match filename {
         "-" => Ok(Box::new(BufReader::new(io::stdin()))),
         _ => Ok(Box::new(BufReader::new(File::open(filename)?))),
+    }
+}
+
+fn format_field(value: usize, show: bool) -> String {
+    if show {
+        format!("{:>8}", value)
+    } else {
+        "".to_string()
     }
 }
 
@@ -112,20 +160,29 @@ pub fn count(mut file: impl BufRead) -> AppResult<FileInfo> {
 
 #[cfg(test)]
 mod tests {
-    use super::{count, FileInfo};
+    use super::{count, format_field, FileInfo};
     use std::io::Cursor;
 
     #[test]
+    fn test_format_field() {
+        assert_eq!(format_field(1, false), "");
+        assert_eq!(format_field(3, true), "       3");
+        assert_eq!(format_field(10, true), "      10");
+    }
+
+    #[test]
     fn test_count() {
-        let text = "I don't want the world. I just want your half.\r\n";
-        let info = count(Cursor::new(text));
-        assert!(info.is_ok());
-        let expected = FileInfo {
-            lines: 1,
-            words: 10,
-            bytes: 48,
-            chars: 48,
-        };
-        assert_eq!(info.unwrap(), expected);
+        assert_eq!(
+            count(Cursor::new(
+                "I don't want the world. I just want your half.\r\n"
+            ))
+            .unwrap(),
+            FileInfo {
+                lines: 1,
+                words: 10,
+                bytes: 48,
+                chars: 48,
+            }
+        );
     }
 }
