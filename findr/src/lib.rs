@@ -72,19 +72,19 @@ impl App {
                     Ok(entry) => Some(entry),
                 })
                 .filter(|entry| {
+                    self.names.is_empty()
+                        || self
+                            .names
+                            .iter()
+                            .any(|name| name.is_match(&entry.file_name().to_string_lossy()))
+                })
+                .filter(|entry| {
                     self.entry_types.is_empty()
                         || self.entry_types.iter().any(|entry_type| match entry_type {
                             EntryType::File => entry.file_type().is_file(),
                             EntryType::Dir => entry.file_type().is_dir(),
                             EntryType::Link => entry.file_type().is_symlink(),
                         })
-                })
-                .filter(|entry| {
-                    self.names.is_empty()
-                        || self
-                            .names
-                            .iter()
-                            .any(|name| name.is_match(&entry.file_name().to_string_lossy()))
                 })
                 .map(|entry| entry.path().display().to_string())
                 .collect::<Vec<_>>();
