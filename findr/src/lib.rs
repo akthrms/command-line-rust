@@ -18,8 +18,8 @@ impl FromStr for EntryType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "d" => Ok(Self::Dir),
             "f" => Ok(Self::File),
+            "d" => Ok(Self::Dir),
             "l" => Ok(Self::Link),
             _ => Err(format!("invalid type: {}", s)),
         }
