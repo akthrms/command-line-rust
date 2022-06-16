@@ -2,7 +2,7 @@ use clap::Parser;
 use regex::Regex;
 use std::error::Error;
 use std::str::FromStr;
-use walkdir::{DirEntry, WalkDir};
+use walkdir::WalkDir;
 
 type AppResult<T> = Result<T, Box<dyn Error>>;
 
@@ -61,23 +61,6 @@ pub struct App {
 
 impl App {
     pub fn run(self) -> AppResult<()> {
-        let type_filter = |entry: &DirEntry| {
-            self.entry_types.is_empty()
-                || self.entry_types.iter().any(|entry_type| match entry_type {
-                    EntryType::File => entry.file_type().is_file(),
-                    EntryType::Dir => entry.file_type().is_dir(),
-                    EntryType::Link => entry.file_type().is_symlink(),
-                })
-        };
-
-        let name_filter = |entry: &DirEntry| {
-            self.names.is_empty()
-                || self
-                    .names
-                    .iter()
-                    .any(|name| name.is_match(&entry.file_name().to_string_lossy()))
-        };
-
         for path in &self.paths {
             let entries = WalkDir::new(path)
                 .into_iter()
@@ -88,8 +71,21 @@ impl App {
                     }
                     Ok(entry) => Some(entry),
                 })
-                .filter(type_filter)
-                .filter(name_filter)
+                .filter(|entry| {
+                    self.entry_types.is_empty()
+                        || self.entry_types.iter().any(|entry_type| match entry_type {
+                            EntryType::File => entry.file_type().is_file(),
+                            EntryType::Dir => entry.file_type().is_dir(),
+                            EntryType::Link => entry.file_type().is_symlink(),
+                        })
+                })
+                .filter(|entry| {
+                    self.names.is_empty()
+                        || self
+                            .names
+                            .iter()
+                            .any(|name| name.is_match(&entry.file_name().to_string_lossy()))
+                })
                 .map(|entry| entry.path().display().to_string())
                 .collect::<Vec<_>>();
 
