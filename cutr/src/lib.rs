@@ -74,10 +74,12 @@ pub struct App {
 
 impl App {
     pub fn run(self) -> AppResult<()> {
+        let extract = self.extract();
+
         for filename in &self.files {
             match open(filename) {
                 Err(e) => eprintln!("{}: {}", filename, e),
-                Ok(file) => match &self.extract() {
+                Ok(file) => match &extract {
                     Extract::Fields(pos) => {
                         let mut reader = ReaderBuilder::new()
                             .delimiter(self.delimiter)
@@ -92,11 +94,13 @@ impl App {
                             writer.write_record(extract_fields(&record?, pos))?;
                         }
                     }
+
                     Extract::Bytes(pos) => {
                         for line in file.lines() {
                             println!("{}", extract_bytes(&line?, pos))
                         }
                     }
+
                     Extract::Chars(pos) => {
                         for line in file.lines() {
                             println!("{}", extract_chars(&line?, pos))
