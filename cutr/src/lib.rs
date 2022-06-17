@@ -1,4 +1,5 @@
 use clap::{ErrorKind, IntoApp, Parser};
+use csv::{ReaderBuilder, StringRecord, WriterBuilder};
 use regex::Regex;
 use std::{
     error::Error,
@@ -36,7 +37,7 @@ pub struct App {
         long = "delim",
         value_name = "DELIMITER",
         default_value = "\t",
-        parse(try_from_str = parse_delimiter)
+        parse(try_from_str = parse_delim)
     )]
     delimiter: u8,
 
@@ -73,7 +74,38 @@ pub struct App {
 
 impl App {
     pub fn run(self) -> AppResult<()> {
-        println!("{:?}", self);
+        for filename in &self.files {
+            match open(filename) {
+                Err(e) => eprintln!("{}: {}", filename, e),
+                Ok(file) => match &self.extract() {
+                    Extract::Fields(pos) => {
+                        let mut reader = ReaderBuilder::new()
+                            .delimiter(self.delimiter)
+                            .has_headers(false)
+                            .from_reader(file);
+
+                        let mut writer = WriterBuilder::new()
+                            .delimiter(self.delimiter)
+                            .from_writer(io::stdout());
+
+                        for record in reader.records() {
+                            writer.write_record(extract_fields(&record?, pos))?;
+                        }
+                    }
+                    Extract::Bytes(pos) => {
+                        for line in file.lines() {
+                            println!("{}", extract_bytes(&line?, pos))
+                        }
+                    }
+                    Extract::Chars(pos) => {
+                        for line in file.lines() {
+                            println!("{}", extract_chars(&line?, pos))
+                        }
+                    }
+                },
+            }
+        }
+
         Ok(())
     }
 
@@ -95,7 +127,7 @@ impl App {
     }
 }
 
-fn parse_delimiter(input: &str) -> Result<u8, String> {
+fn parse_delim(input: &str) -> Result<u8, String> {
     let bytes = input.as_bytes();
 
     if bytes.len() == 1 {
@@ -152,4 +184,32 @@ fn open(filename: &str) -> AppResult<Box<dyn BufRead>> {
         "-" => Ok(Box::new(BufReader::new(io::stdin()))),
         _ => Ok(Box::new(BufReader::new(File::open(filename)?))),
     }
+}
+
+fn extract_fields<'a>(record: &'a StringRecord, pos: &[Range<usize>]) -> Vec<&'a str> {
+    pos.iter()
+        .cloned()
+        .flat_map(|range| range.filter_map(|i| record.get(i)))
+        .collect()
+}
+
+fn extract_bytes(line: &str, pos: &[Range<usize>]) -> String {
+    let bytes = line.as_bytes();
+
+    let bytes = pos
+        .iter()
+        .cloned()
+        .flat_map(|range| range.filter_map(|i| bytes.get(i).copied()))
+        .collect::<Vec<_>>();
+
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
+fn extract_chars(line: &str, pos: &[Range<usize>]) -> String {
+    let chars = line.chars().collect::<Vec<_>>();
+
+    pos.iter()
+        .cloned()
+        .flat_map(|range| range.filter_map(|i| chars.get(i)))
+        .collect()
 }
